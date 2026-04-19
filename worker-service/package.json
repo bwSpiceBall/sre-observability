@@ -1,0 +1,17 @@
+{
+  "name": "worker-service",
+  "version": "1.0.0",
+  "description": "Observability demo - Worker service",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "author": "observability-team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pino": "^8.16.0",
+    "prom-client": "^14.1.1",
+    "uuid": "^9.0.0"
+  }
+}
