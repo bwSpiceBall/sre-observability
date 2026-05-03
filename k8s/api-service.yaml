@@ -1,0 +1,73 @@
+apiVersion: apps/v1 # Use the current Deployment API.
+kind: Deployment # Run the API as a managed pod set.
+metadata:
+  name: api-service # Stable name for this workload.
+spec:
+  replicas: 1 # One pod is enough for a demo service and keeps failure behavior easy to see.
+  selector:
+    matchLabels:
+      app: api-service # Must match the pod labels below so the Deployment manages the right pods.
+  template:
+    metadata:
+      labels:
+        app: api-service # Labels used by the Service selector.
+    spec:
+      containers:
+        - name: api-service # Container name inside the pod.
+          image: api-service:latest # Local or private-registry image for the API.
+          imagePullPolicy: IfNotPresent # Avoid pulling every restart when the image is already on the node.
+          ports:
+            - name: http # Named port used by probes and the Service.
+              containerPort: 3000 # Matches the app's default listen port.
+          env:
+            - name: PORT # Tells the app which port to bind to.
+              value: "3000"
+            - name: ERROR_RATE # Injects random 500s for fault testing.
+              value: "0.05"
+            - name: LATENCY_MS # Adds artificial delay for slow-response testing.
+              value: "2000"
+            - name: DEPENDENCY_FAIL_RATE # Simulates downstream failures.
+              value: "0.03"
+            - name: DOWNSTREAM_TIMEOUT_MS # Forces timeout behavior in downstream calls.
+              value: "1200"
+            - name: CB_FAILURE_THRESHOLD # Opens the circuit after this many failures.
+              value: "5"
+            - name: CB_RESET_TIMEOUT_MS # Keeps the circuit open before retrying.
+              value: "10000"
+          readinessProbe:
+            httpGet:
+              path: /health # Fast health check for traffic routing.
+              port: http # Reuses the named container port.
+            initialDelaySeconds: 5 # Give the app time to start.
+            periodSeconds: 10 # Check regularly.
+            timeoutSeconds: 2 # Fail fast if the app is hung.
+            failureThreshold: 3 # Avoid marking the pod unready on a single blip.
+          livenessProbe:
+            httpGet:
+              path: /health # Confirms the process is still alive.
+              port: http # Reuses the named container port.
+            initialDelaySeconds: 15 # Wait longer before restarting a slow start.
+            periodSeconds: 20 # Check periodically.
+            timeoutSeconds: 2 # Restart if it stops responding.
+            failureThreshold: 3 # Reduce false positives.
+          resources:
+            requests:
+              cpu: 50m # Small baseline reservation for a lightweight Node app.
+              memory: 64Mi # Enough for a minimal demo pod.
+            limits:
+              cpu: 250m # Prevent runaway CPU use.
+              memory: 256Mi # Keep leaks visible while capping node impact.
+---
+apiVersion: v1 # Core Kubernetes API for networking.
+kind: Service # Stable network endpoint for the Deployment.
+metadata:
+  name: api-service # Service name inside the cluster.
+spec:
+  type: NodePort # Exposes the service on the mini PC's node port, not the public internet.
+  selector:
+    app: api-service # Routes traffic to pods with this label.
+  ports:
+    - name: http # Service port name.
+      port: 80 # In-cluster port for clients.
+      targetPort: http # Sends traffic to the container's named port.
+      nodePort: 30080 # Fixed LAN port for direct access from your mini PC network.
