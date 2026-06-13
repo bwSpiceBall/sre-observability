@@ -7,9 +7,10 @@ WORKDIR /usr/src/app
 # Set production environment
 ENV NODE_ENV=production
 
-# Copy package files and install production dependencies
-COPY package*.json ./
-RUN npm ci --only=production && chown -R node:node /usr/src/app
+# Install dependencies from public npm registry
+COPY .npmrc ./
+COPY package.json ./
+RUN npm install --only=production && chown -R node:node /usr/src/app
 
 # Copy source and set ownership for the runtime user
 COPY --chown=node:node src ./src
